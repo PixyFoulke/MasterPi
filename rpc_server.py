@@ -23,7 +23,8 @@ import functions.color_sorting as color_sorting
 import functions.visual_patrol as visual_patrol
 import functions.avoidance as avoidance
 
-# 读取舵机偏差
+
+# 读取舵机偏差(read servo deviation)
 deviation_data = yaml_handle.get_yaml_data(yaml_handle.Deviation_file_path)
 
 if sys.version_info.major == 2:
@@ -38,7 +39,9 @@ __RPC_E05 = "E05 - Not callable"
 
 HWSONAR = None
 QUEUE = None
-    
+
+
+
 def set_board():
     color_detect.board = board
     color_tracking.board = board
@@ -53,8 +56,10 @@ def set_board():
     avoidance.AK = AK
     
     color_detect.initMove()
-    board.set_buzzer(1900, 0.3, 0.7, 1)
-
+    board.set_buzzer(432, 0.3, 0.7, 1)
+    board.pwm_servo_set_position(1, [[3,1300]]) #SET LEFT ZERO
+    board.pwm_servo_set_position(1, [[4,1200]]) #SET RIGHT ZERO
+    
 chassis = mecanum.MecanumChassis()
 
 @dispatcher.add_method
@@ -65,7 +70,7 @@ data = []
 @dispatcher.add_method
 def SetPWMServo(*args, **kwargs):
     ret = (True, (), 'SetPWMServo')
-    print("SetPWMServo:",args)
+    #print("SetPWMServo:",args)
     arglen = len(args)
     try:
         servos = args[1:arglen:2]
@@ -75,11 +80,12 @@ def SetPWMServo(*args, **kwargs):
         
         dat = zip(servos, pulses)
         for (s, p) in dat:
-            # 实际角度 = 控制角度 + 偏差角度
+            # 实际角度 = 控制角度 + 偏差角度(Actual angle = Control angle + Deviation angle)
             pulses = int(map(p,90,-90,500,2500)) + deviation_data['{}'.format(s)]
-            print("pulses:",pulses)
             data.extend([[s, pulses]])
         board.pwm_servo_set_position(use_times/1000.0, data)
+        
+        
         data.clear()
         
     except Exception as e:
@@ -101,7 +107,7 @@ def SetMovementAngle(angle):
         ret = (False, __RPC_E03, 'SetMovementAngle')
         return ret
 
-# 电机控制
+# 电机控制(motor control)
 @dispatcher.add_method
 def SetBrushMotor(*args, **kwargs):
     ret = (True, (), 'SetBrushMotor')
@@ -125,7 +131,7 @@ def SetBrushMotor(*args, **kwargs):
         ret = (False, __RPC_E03, 'SetBrushMotor')
     return ret
 
-# 获取超声波测距
+# 获取超声波测距(obtain ultrasonic ranging)
 @dispatcher.add_method
 def GetSonarDistance():
     global HWSONAR
@@ -136,7 +142,7 @@ def GetSonarDistance():
         ret = (False, __RPC_E03, 'GetSonarDistance')
     return ret
 
-# 获取当前电池电压
+# 获取当前电池电压(obtain the current battery voltage)
 @dispatcher.add_method
 def GetBatteryVoltage():
     ret = (True, 0, 'GetBatteryVoltage')
@@ -147,7 +153,7 @@ def GetBatteryVoltage():
         ret = (False, __RPC_E03, 'GetBatteryVoltage')
     return ret
 
-# 设置超声波rgb灯模式
+# 设置超声波rgb灯模式(set ultrasonic rgb light mode)
 @dispatcher.add_method
 def SetSonarRGBMode(mode = 0):
     global HWSONAR
@@ -155,7 +161,7 @@ def SetSonarRGBMode(mode = 0):
     HWSONAR.setRGBMode(mode)
     return (True, (mode,), 'SetSonarRGBMode')
 
-# 设置超声波rgb灯颜色
+# 设置超声波rgb灯颜色(set ultrasonic rgb light color)
 @dispatcher.add_method
 def SetSonarRGB(index, r, g, b):
     global HWSONAR
@@ -167,7 +173,7 @@ def SetSonarRGB(index, r, g, b):
         HWSONAR.setPixelColor(index, (r, g, b))
     return (True, (r, g, b), 'SetSonarRGB')
 
-# 设置超声波闪烁的颜色和周期
+# 设置超声波闪烁的颜色和周期(set ultrasonic flashing color and cycle)
 @dispatcher.add_method
 def SetSonarRGBBreathCycle(index, color, cycle):
     global HWSONAR
@@ -175,7 +181,7 @@ def SetSonarRGBBreathCycle(index, color, cycle):
     HWSONAR.setBreathCycle(index, color, cycle)
     return (True, (index, color, cycle), 'SetSonarRGBBreathCycle')
 
-# 设置超声波开始闪烁
+# 设置超声波开始闪烁(set ultrasonic to start flashing)
 @dispatcher.add_method
 def SetSonarRGBStartSymphony():
     global HWSONAR
@@ -183,19 +189,19 @@ def SetSonarRGBStartSymphony():
     HWSONAR.startSymphony()    
     return (True, (), 'SetSonarRGBStartSymphony')
 
-# 设置避障速度
+# 设置避障速度(set the speed of obstacle avoidance)
 @dispatcher.add_method
 def SetAvoidanceSpeed(speed=50):
     #print(speed)
     return runbymainth(avoidance.setSpeed, (speed,))
 
-# 设置避障阈值
+# 设置避障阈值(set the threshold of obstacle avoidance)
 @dispatcher.add_method
 def SetSonarDistanceThreshold(new_threshold=30):
     #print(new_threshold)
     return runbymainth(avoidance.setThreshold, (new_threshold,))
 
-# 获取当前避障阈值
+# 获取当前避障阈值(obtain the current threshold of obstacle avoidance)
 @dispatcher.add_method
 def GetSonarDistanceThreshold():
     return runbymainth(avoidance.getThreshold, ())
@@ -460,20 +466,20 @@ def Avoidance(*target_color):
     return runbymainth(avoidance.setTargetColor, target_color)
 
 
-# 设置颜色阈值
-# 参数：颜色lab
+# 设置颜色阈值(set color threshold)
+# 参数：颜色lab(parameter: color lab)
 # 例如：[{'red': ((0, 0, 0), (255, 255, 255))}]
 @dispatcher.add_method
 def SetLABValue(*lab_value):
     #print(lab_value)
     return runbymainth(lab_adjust.setLABValue, lab_value)
 
-# 保存颜色阈值
+# 保存颜色阈值(save color threshold)
 @dispatcher.add_method
 def GetLABValue():
     return (True, lab_adjust.getLABValue()[1], 'GetLABValue')
 
-# 保存颜色阈值
+# 保存颜色阈值(save color threshold)
 @dispatcher.add_method
 def SaveLABValue(color=''):
     return runbymainth(lab_adjust.saveLABValue, (color, ))
