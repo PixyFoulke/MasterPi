@@ -12,6 +12,7 @@ app = Flask(__name__)
 # --- Robot State ---
 # Store the current speed percentage, updated by the frontend slider.
 current_speed_percent = 50
+current_swivel_angle = 1500
 
 # --- Camera Setup ---
 # Initialize and configure the camera directly using picamera2
@@ -20,7 +21,6 @@ camera.configure(camera.create_preview_configuration(main={"format": 'XRGB8888',
 camera.start()
 # Give the camera a moment to warm up
 time.sleep(1)
-
 
 @app.route('/')
 def index():
@@ -65,7 +65,7 @@ def gen_frames():
 def video_feed():
     """Video streaming route that calls the frame generator."""
     return Response(gen_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+                   mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/control', methods=['POST'])
 def control():
@@ -123,15 +123,29 @@ def control():
             
     # --- Gimbal Control (Placeholder) ---
     elif command == 'gimbal':
+        print(current_swivel_angle)
         if value == 'left':
-            print("Pivoting gimbal left")
+            current_swivel_angle += 50
+            if current_swivel_angle >= 2500:
+                current_swivel_angle = 2500
+                print("Cannot swivel further")
+            else:
+                print("Pivoting gimbal left")
+                swivel.rotateCamera(current_swivel_angle,1)
+                print("Pivoting gimbal left")
         elif value == 'right':
-            print("Pivoting gimbal right")
+            current_swivel_angle -= 50
+            if current_swivel_angle <= 500:
+                current_swivel_angle = 500
+                print("Cannot swivel further")
+            else:
+                print("Pivoting gimbal right")
+                swivel.rotateCamera(current_swivel_angle,1)
+                print("Pivoting gimbal right")
         elif value == 'stop':
             print("Gimbal stopped")
 
     return jsonify(status="success", command=command, value=value)
-
 
 @app.route('/update_speed', methods=['POST'])
 def update_speed():
@@ -153,9 +167,9 @@ if __name__ == '__main__':
     # Initialize the robot motor pins on startup
     try:
         mechanum.init()
-        print("âœ… Motor pins initialized successfully.")
+        print("✓ Motor pins initialized successfully.")
     except Exception as e:
-        print(f"âš ï¸  Could not initialize motor pins: {e}")
+        print(f"⚠️ Could not initialize motor pins: {e}")
         print("Running in simulation mode without GPIO control.")
 
     # Run the Flask web server
